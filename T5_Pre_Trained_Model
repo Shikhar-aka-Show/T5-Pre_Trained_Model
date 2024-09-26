@@ -1,1 +1,179 @@
-Pre Trained Model.
+{
+  "nbformat": 4,
+  "nbformat_minor": 0,
+  "metadata": {
+    "colab": {
+      "provenance": [],
+      "authorship_tag": "ABX9TyOPHiRRZ9G0z5TiWZCTU6iY",
+      "include_colab_link": true
+    },
+    "kernelspec": {
+      "name": "python3",
+      "display_name": "Python 3"
+    },
+    "language_info": {
+      "name": "python"
+    }
+  },
+  "cells": [
+    {
+      "cell_type": "markdown",
+      "metadata": {
+        "id": "view-in-github",
+        "colab_type": "text"
+      },
+      "source": [
+        "<a href=\"https://colab.research.google.com/github/Shikhar-aka-Show/Classification-/blob/main/T5_Pre_Trained_Model_.ipynb\" target=\"_parent\"><img src=\"https://colab.research.google.com/assets/colab-badge.svg\" alt=\"Open In Colab\"/></a>"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "execution_count": null,
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "cNhFQeCPYbOx",
+        "outputId": "f5e77ab4-b943-42e2-9084-728622773bad"
+      },
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.10/dist-packages/huggingface_hub/utils/_token.py:89: UserWarning: \n",
+            "The secret `HF_TOKEN` does not exist in your Colab secrets.\n",
+            "To authenticate with the Hugging Face Hub, create a token in your settings tab (https://huggingface.co/settings/tokens), set it as secret in your Google Colab and restart your session.\n",
+            "You will be able to reuse this secret in all of your notebooks.\n",
+            "Please note that authentication is recommended but still optional to access public models or datasets.\n",
+            "  warnings.warn(\n",
+            "You are using the default legacy behaviour of the <class 'transformers.models.t5.tokenization_t5.T5Tokenizer'>. This is expected, and simply means that the `legacy` (previous) behavior will be used so nothing changes for you. If you want to use the new behaviour, set `legacy=False`. This should only be set if you understand what it means, and thoroughly read the reason why this was added as explained in https://github.com/huggingface/transformers/pull/24565\n",
+            "/usr/local/lib/python3.10/dist-packages/transformers/tokenization_utils_base.py:1601: FutureWarning: `clean_up_tokenization_spaces` was not set. It will be set to `True` by default. This behavior will be depracted in transformers v4.45, and will be then set to `False` by default. For more details check this issue: https://github.com/huggingface/transformers/issues/31884\n",
+            "  warnings.warn(\n"
+          ]
+        }
+      ],
+      "source": [
+        "#Here I downloaded the T5 Pre trained model\n",
+        "from transformers import T5Tokenizer, T5ForConditionalGeneration\n",
+        "tokenizer = T5Tokenizer.from_pretrained('t5-base')\n",
+        "model = T5ForConditionalGeneration.from_pretrained('t5-base')"
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from torch.utils.data import Dataset, DataLoader\n",
+        "\n",
+        "class MyDataset(Dataset):\n",
+        "    def __init__(self, tokenizer, texts, targets, max_len=512):\n",
+        "        self.tokenizer = tokenizer\n",
+        "        self.texts = texts\n",
+        "        self.targets = targets\n",
+        "        self.max_len = max_len\n",
+        "\n",
+        "    def __len__(self):\n",
+        "        return len(self.texts)\n",
+        "\n",
+        "    def __getitem__(self, index):\n",
+        "        input_text = self.texts[index]\n",
+        "        target_text = self.targets[index]\n",
+        "\n",
+        "        input_encoding = self.tokenizer(input_text, max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt')\n",
+        "        target_encoding = self.tokenizer(target_text, max_length=self.max_len, padding='max_length', truncation=True, return_tensors='pt')\n",
+        "\n",
+        "        return {\n",
+        "            'input_ids': input_encoding['input_ids'].squeeze(),\n",
+        "            'attention_mask': input_encoding['attention_mask'].squeeze(),\n",
+        "            'labels': target_encoding['input_ids'].squeeze(),\n",
+        "        }\n",
+        "\n",
+        "# Example Usage\n",
+        "texts = [\"translate English to French: Hello world\", \"translate English to French: How are you\"]\n",
+        "targets = [\"Bonjour le monde\", \"Comment vas-tu?\"]\n",
+        "dataset = MyDataset(tokenizer, texts, targets)\n",
+        "dataloader = DataLoader(dataset, batch_size=2)\n"
+      ],
+      "metadata": {
+        "id": "PLkZMJWPY0wZ"
+      },
+      "execution_count": null,
+      "outputs": []
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "from transformers import AdamW\n",
+        "epochs = 2\n",
+        "optimizer = AdamW(model.parameters(), lr=5e-5)\n",
+        "\n",
+        "model.train()\n",
+        "for epoch in range(epochs):\n",
+        "  for batch in dataloader:\n",
+        "    optimizer.zero_grad()\n",
+        "\n",
+        "    outputs = model(input_ids=batch['input_ids'], attention_mask=batch['attention_mask'], labels=batch['labels'])\n",
+        "    loss = outputs.loss\n",
+        "    loss.backward()\n",
+        "    optimizer.step()\n",
+        "    print(f\"Epoch {epoch}, Loss: {loss.item()}\")"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "-eJtF7bag9iY",
+        "outputId": "c5657e08-7b9e-4a9a-80a6-44666da47bc1"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "stream",
+          "name": "stderr",
+          "text": [
+            "/usr/local/lib/python3.10/dist-packages/transformers/optimization.py:591: FutureWarning: This implementation of AdamW is deprecated and will be removed in a future version. Use the PyTorch implementation torch.optim.AdamW instead, or set `no_deprecation_warning=True` to disable this warning\n",
+            "  warnings.warn(\n"
+          ]
+        },
+        {
+          "output_type": "stream",
+          "name": "stdout",
+          "text": [
+            "Epoch 0, Loss: 17.157520294189453\n",
+            "Epoch 1, Loss: 15.467917442321777\n"
+          ]
+        }
+      ]
+    },
+    {
+      "cell_type": "code",
+      "source": [
+        "model.save_pretrained('./fine-tuned_t5')\n",
+        "tokenizer.save_pretrained('./fine-tuned_t5')"
+      ],
+      "metadata": {
+        "colab": {
+          "base_uri": "https://localhost:8080/"
+        },
+        "id": "3ERDRrA4i7bt",
+        "outputId": "7d5c6de2-cd5f-434a-e44c-ac0a4403c230"
+      },
+      "execution_count": null,
+      "outputs": [
+        {
+          "output_type": "execute_result",
+          "data": {
+            "text/plain": [
+              "('./fine-tuned_t5/tokenizer_config.json',\n",
+              " './fine-tuned_t5/special_tokens_map.json',\n",
+              " './fine-tuned_t5/spiece.model',\n",
+              " './fine-tuned_t5/added_tokens.json')"
+            ]
+          },
+          "metadata": {},
+          "execution_count": 6
+        }
+      ]
+    }
+  ]
+}
